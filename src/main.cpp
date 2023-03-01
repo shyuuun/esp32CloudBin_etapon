@@ -8,7 +8,7 @@
 #include <Wire.h>
 #include <NewPing.h>
 #include <DallasTemperature.h>
-
+#include "Fonts/TomThumb.h"
 // testing
 #include <WiFi.h>
 
@@ -16,9 +16,8 @@ int adcAverage(int batteryPin, int read);
 float adcToVolts(int batteryPin);
 float voltToBatteryPercent(float voltage, float in_min, float in_max, float out_min, float out_max);
 int getThreshold(int distance);
-void getValue();
-void getValues();
 void RestartGSMModem();
+void getValue();
 String GSMSignalLevel(int level);
 String GSMRegistrationStatus(RegStatus state);
 String SIMStatus(SimStatus state);
@@ -27,6 +26,9 @@ void Init_GSM_SIM800();
 void initWiFi();
 void searchWiFi();
 void startDisplay();
+void soundhelena();
+void soundLeftErr();
+void soundRightErr();
 
 const char *ssid = "GlobeAtHome_B01FB";
 const char *password = "48550858";
@@ -42,6 +44,9 @@ const long gmtOffset_sec = 8;
 #define ultraEcho1 5
 #define ultraTrig2 18
 #define ultraEcho2 19
+
+#define BUTTON_PIN_1 27
+#define BUTTON_PIN_1 26
 
 #define ADC_PIN 14
 #define CONV_FACTOR 1.75
@@ -77,7 +82,7 @@ DallasTemperature sensors(&oneWire);
 
 // Others
 #define uS_TO_S_FACTOR 1000000ULL
-#define TIME_TO_SLEEP 600
+#define TIME_TO_SLEEP 60
 #define S_TO_MIN_FACTOR 60
 
 TinyGsm modemGSM(Serial2);
@@ -175,11 +180,15 @@ void setup()
         for (;;)
             ; // Don't proceed, loop forever
     }
+    pinMode(BUZZZER_PIN, OUTPUT);
+    pinMode(BUTTON_PIN_1, INPUT_PULLUP);
+    pinMode(BUTTON_PIN_2, INPUT_PULLUP);
 
     startDisplay();
-    delay(5000);
+    delay(2000);
 
-    // Init_GSM_SIM800();
+    Init_GSM_SIM800();
+
 
     // int distance1 = 20 + (int)random(20)/10;
     // int distance2 = 30 + (int)random(30)/10;
@@ -192,9 +201,7 @@ void setup()
 
 void loop()
 {
-
     getValue();
-
     /* Code for no temp and with temp
 
     Serial.print("Temperature for Device 1 is: ");
@@ -215,9 +222,6 @@ void loop()
 
     Serial.print("Distance w/ temp: ");
     Serial.println(distance1);
-
-
-
     duration2 = sonar2.ping_median(5, 50);
     Serial.print("Ping Median2: ");
     Serial.println(duration2);
@@ -231,10 +235,19 @@ void loop()
     Serial.println(distance2);
 
     */
+    display.clearDisplay();
+    display.setTextColor(WHITE);
+    display.setTextSize(2);
+    display.setFont(&TomThumb);
+    display.setCursor(0, 10);
+    display.println("Device will sleep");
+    display.display();
+    delay(2000);
     esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
     Serial.println("Setup ESP32 to sleep for every " + String(TIME_TO_SLEEP) +
                    " Seconds");
     Serial.println("Going to sleep now");
+    display.ssd1306_command(SSD1306_DISPLAYOFF);
     Serial.flush();
     esp_deep_sleep_start();
     Serial.println("This will never be printed");
@@ -291,8 +304,6 @@ void getValue()
     delay(100);
     
 
-
-
     sensorValue = analogRead(14);
     voltage = adcToVolts(sensorValue);
     bat_percentage = voltToBatteryPercent(voltage, 2.5, 4.2, 0, 100);
@@ -305,8 +316,10 @@ void getValue()
     Serial.println(bat_percentage);
     Serial.println("");
 
+    delay(5000);
     display.clearDisplay();
     display.drawBitmap(5, 8, trashbin, 128, 64, WHITE);
+    display.setFont(NULL);
     display.setTextSize(1);
     display.setTextColor(WHITE);
     display.setCursor(58, 8);
@@ -315,15 +328,35 @@ void getValue()
     display.print(distanceThresh1);
     display.setCursor(58, 40);
     display.print("Bin 2:");
-
     display.setCursor(64, 52);
     display.print(distanceThresh2);
     display.display();
+    
+    delay(5000);
 
-    // String data = "{\"binName\":\"" + name + "\",\"battery2\": " + bat_percentage + ",\"bin3\": " + distanceThresh1 + ",\"bin4\": " + distanceThresh2 + "}";
+    display.clearDisplay();
+    display.setCursor(22, 23);
+    display.print("Sending Values");
+    display.setCursor(25, 35);
+    display.println("to the server");
+    display.display();
 
-    // Serial.println("Send data [" + data + "] to [" + server + "].");
-    // SendTextByPOST(server, "/update_data", data);
+    String data = "{\"binName\":\"" + name + "\",\"battery1\": " + bat_percentage + ",\"bin1\": " + distanceThresh1 + ",\"bin2\": " + distanceThresh2 + "}";
+
+    Serial.println("Send data [" + data + "] to [" + server + "].");
+
+    SendTextByPOST(server, "/update_data", data);
+    tone(BUZZZER_PIN, 164.81, 500);
+    tone(BUZZZER_PIN, 220.00, 500);
+    noTone(BUZZZER_PIN);
+    display.clearDisplay();
+    display.setTextColor(WHITE);
+    display.setTextSize(1);
+    display.setFont(NULL);
+    display.setCursor(1, 3);
+    display.print("Success");
+    display.display();
+    delay(5000);
 }
 
 int adcAverage(int batteryPin, int read)
@@ -388,18 +421,6 @@ int getThreshold(int distance)
     return distanceThresh;
 }
 
-void getValues()
-{
-    display.clearDisplay();
-    display.drawBitmap(5, 8, trashbin, 128, 64, WHITE);
-    display.setTextSize(1);
-    display.setTextColor(WHITE);
-    display.setCursor(58, 8);
-    display.print("Bin Left:");
-    display.setCursor(58, 40);
-    display.print("Bin Right:");
-    display.display();
-}
 
 void RestartGSMModem()
 {
@@ -486,8 +507,10 @@ bool SendTextByPOST(String server, String url, String postData)
         http->print(postData);
         http->endRequest();
 
+    
         // read the status code and body of the response
         int statusCode = http->responseStatusCode();
+
         if (statusCode == 200)
         {
             String response = http->responseBody();
@@ -583,6 +606,35 @@ void Init_GSM_SIM800()
         RestartGSMModem();
     }
     Serial.println("Signal quality: " + GSMSignalLevel(csq) + " [" + String(csq) + "]");
+    
+
+    display.clearDisplay();
+    display.setTextColor(WHITE);
+    display.setTextSize(1);
+    display.setFont(&TomThumb);
+    display.setCursor(1, 7);
+    display.println("Initialize GSM modem...");
+    display.setTextSize(1);
+    display.setCursor(1, 15);
+    display.println("Status: ");
+    display.setCursor(45, 15);
+    display.print(state);
+    display.setCursor(1, 23);
+    display.println("Sim:");
+    display.setCursor(45, 23);
+    display.print(modemGSM.getOperator());
+    display.setCursor(1, 31);
+    display.println("RSSI:");
+    display.setCursor(45, 31);
+    display.print(GSMSignalLevel(csq));
+    display.setCursor(1, 39);
+    display.println("IP:");
+    display.setCursor(45, 39);
+    display.print(local.toString());
+    display.display();
+    
+    delay(5000);
+
 }
 
 void initWiFi()
@@ -643,4 +695,43 @@ void startDisplay(){
     display.setCursor(20, 40);
     display.println("Trash bin 1 & 2");
     display.display();
+
+}
+
+void soundhelena(){
+    
+  tone(BUZZZER_PIN, 783.99);
+  delay(1000);
+  tone(BUZZZER_PIN, 739.99);
+  delay(500);
+  tone(BUZZZER_PIN , 987.77);
+  delay(500);
+  tone(BUZZZER_PIN , 659.25);
+  delay(1000);
+noTone(BUZZZER_PIN);
+  delay(1000);
+}
+
+void soundLeftErr(){
+  tone(BUZZZER_PIN, 659); // E4
+  delay(200);
+  tone(BUZZZER_PIN, 700); // F4
+  delay(200);
+  tone(BUZZZER_PIN, 987.77); //B4
+  delay(200);
+
+  noTone(BUZZZER_PIN);
+  delay(1500);
+}
+void soundRightErr(){
+  // alert bin 2 
+  tone(BUZZZER_PIN, 659); // E4
+  delay(200);
+  tone(BUZZZER_PIN, 700); // E4
+  delay(200);
+  tone(BUZZZER_PIN, 523.25); // C4
+  delay(200);
+
+  noTone(BUZZZER_PIN);
+  delay(1500);
 }
