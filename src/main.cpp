@@ -9,6 +9,8 @@
 #include <NewPing.h>
 #include <DallasTemperature.h>
 #include "Fonts/TomThumb.h"
+
+
 // testing
 #include <WiFi.h>
 
@@ -29,6 +31,9 @@ void startDisplay();
 void soundhelena();
 void soundLeftErr();
 void soundRightErr();
+void goSleep();
+
+
 
 const char *ssid = "GlobeAtHome_B01FB";
 const char *password = "48550858";
@@ -46,7 +51,7 @@ const long gmtOffset_sec = 8;
 #define ultraEcho2 19
 
 #define BUTTON_PIN_1 27
-#define BUTTON_PIN_1 26
+#define BUTTON_PIN_2 26
 
 #define ADC_PIN 14
 #define CONV_FACTOR 1.75
@@ -164,8 +169,14 @@ const unsigned char trashbin[] = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
+
+
+
+
 float distance1, distance2, factoredDis, duration1, duration2;
 int temperature, distanceThresh1, distanceThresh2, bat_percentage, sensorValue;
+int currentState1,
+    currentState2;
 float voltage;
 float factor = sqrt(1 + temperature / 273.15) / 60.368;
 
@@ -184,10 +195,71 @@ void setup()
     pinMode(BUTTON_PIN_1, INPUT_PULLUP);
     pinMode(BUTTON_PIN_2, INPUT_PULLUP);
 
-    startDisplay();
-    delay(2000);
+    currentState1 = digitalRead(BUTTON_PIN_1);
+    currentState2 = digitalRead(BUTTON_PIN_2);
 
-    Init_GSM_SIM800();
+    Serial.print("BTN 1 state: ");
+    Serial.print(currentState1);
+    Serial.println("");
+    Serial.print("BTN 2 state: ");
+    Serial.print(currentState2);
+    Serial.println("");
+
+    if(currentState1 && currentState2 != 0){
+        Serial.println("Please close both lids");
+        display.clearDisplay();
+        display.setTextColor(WHITE);
+        display.setTextSize(1);
+        display.setCursor(25, 15);
+        display.println("Please close both lids");
+        display.setTextSize(1);
+        display.display();
+        soundLeftErr();
+        soundRightErr();
+
+        delay(5000);
+        goSleep();
+
+    } else if (currentState1 != 0){
+        Serial.println("Please close the trashbin lid at left side");
+    display.clearDisplay();
+    display.setTextColor(WHITE);
+    display.setTextSize(1);
+    display.setFont(NULL);
+    display.setCursor(15, 10);
+    display.print("Please Close the");
+    display.setCursor(15, 25);
+    display.print("trash bin lid at");
+    display.setCursor(15, 40);
+    display.print("left side");
+    display.display();
+        soundLeftErr();
+        delay(5000);
+        goSleep();
+    } else if (currentState2 != 0){
+        Serial.println("Please close the trashbin lid at right side");
+        display.clearDisplay();
+    display.setTextColor(WHITE);
+    display.setTextSize(1);
+    display.setFont(NULL);
+    display.setCursor(15, 10);
+    display.print("Please Close the");
+    display.setCursor(15, 25);
+    display.print("trash bin lid at");
+    display.setCursor(15, 40);
+    display.print("right side");
+    display.display();
+        soundRightErr();
+        delay(5000);
+        goSleep();        
+    } else {
+        startDisplay();
+        delay(2000);
+
+        Init_GSM_SIM800();
+    }
+
+
 
 
     // int distance1 = 20 + (int)random(20)/10;
@@ -235,6 +307,11 @@ void loop()
     Serial.println(distance2);
 
     */
+    goSleep();
+    Serial.println("This will never be printed");
+}
+
+void goSleep(){
     display.clearDisplay();
     display.setTextColor(WHITE);
     display.setTextSize(2);
@@ -250,7 +327,6 @@ void loop()
     display.ssd1306_command(SSD1306_DISPLAYOFF);
     Serial.flush();
     esp_deep_sleep_start();
-    Serial.println("This will never be printed");
 }
 
 void getValue()
@@ -735,3 +811,4 @@ void soundRightErr(){
   noTone(BUZZZER_PIN);
   delay(1500);
 }
+
