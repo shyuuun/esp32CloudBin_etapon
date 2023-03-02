@@ -53,7 +53,7 @@ const long gmtOffset_sec = 8;
 #define BUTTON_PIN_1 27
 #define BUTTON_PIN_2 26
 
-#define ADC_PIN 14
+#define ADC_PIN 12
 #define CONV_FACTOR 1.75
 
 NewPing sonar1(ultraTrig1, ultraEcho1);
@@ -87,7 +87,7 @@ DallasTemperature sensors(&oneWire);
 
 // Others
 #define uS_TO_S_FACTOR 1000000ULL
-#define TIME_TO_SLEEP 60
+#define TIME_TO_SLEEP 900 // 15 mins 
 #define S_TO_MIN_FACTOR 60
 
 TinyGsm modemGSM(Serial2);
@@ -184,20 +184,21 @@ void setup()
 {
     Serial.begin(9600);
     delay(500);
-
+    
     if (!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS))
     {
         Serial.println(F("SSD1306 allocation failed"));
         for (;;)
             ; // Don't proceed, loop forever
     }
+
     pinMode(BUZZZER_PIN, OUTPUT);
     pinMode(BUTTON_PIN_1, INPUT_PULLUP);
     pinMode(BUTTON_PIN_2, INPUT_PULLUP);
 
     currentState1 = digitalRead(BUTTON_PIN_1);
     currentState2 = digitalRead(BUTTON_PIN_2);
-
+    
     Serial.print("BTN 1 state: ");
     Serial.print(currentState1);
     Serial.println("");
@@ -253,12 +254,13 @@ void setup()
         delay(5000);
         goSleep();        
     } else {
-        startDisplay();
-        delay(2000);
 
-        Init_GSM_SIM800();
     }
 
+    startDisplay();
+    delay(2000);
+
+    Init_GSM_SIM800();
 
 
 
@@ -501,7 +503,7 @@ int getThreshold(int distance)
 void RestartGSMModem()
 {
     Serial.println("Restarting GSM...");
-    if (!modemGSM.restart())
+    if (!modemGSM.restart()) // orignally restart()
     {
         Serial.println("\tFailed. :-(\r\n");
         // ESP.restart();
