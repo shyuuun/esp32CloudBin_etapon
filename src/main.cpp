@@ -50,8 +50,8 @@ const long gmtOffset_sec = 8;
 #define ultraTrig2 18
 #define ultraEcho2 19
 
-#define BUTTON_PIN_1 27
-#define BUTTON_PIN_2 26
+#define BUTTON_PIN_1 14
+#define BUTTON_PIN_2 27
 
 #define ADC_PIN 12
 #define CONV_FACTOR 1.75
@@ -101,7 +101,7 @@ int Modem_Reboots_Counter = 0;
 
 HttpClient *http;
 
-String name = "Cloudbin_ITECH1";
+String name = "Cloudbin_ITECH2";
 
 const unsigned char trashbin[] = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -198,7 +198,7 @@ void setup()
 
     currentState1 = digitalRead(BUTTON_PIN_1);
     currentState2 = digitalRead(BUTTON_PIN_2);
-    
+
     Serial.print("BTN 1 state: ");
     Serial.print(currentState1);
     Serial.println("");
@@ -419,7 +419,7 @@ void getValue()
     display.println("to the server");
     display.display();
 
-    String data = "{\"binName\":\"" + name + "\",\"battery1\": " + bat_percentage + ",\"bin1\": " + distanceThresh1 + ",\"bin2\": " + distanceThresh2 + "}";
+    String data = "{\"binName\":\"" + name + "\",\"battery2\": " + bat_percentage + ",\"bin3\": " + distanceThresh1 + ",\"bin4\": " + distanceThresh2 + "}";
 
     Serial.println("Send data [" + data + "] to [" + server + "].");
 
@@ -684,7 +684,11 @@ void Init_GSM_SIM800()
         RestartGSMModem();
     }
     Serial.println("Signal quality: " + GSMSignalLevel(csq) + " [" + String(csq) + "]");
-    
+    int battLevel = modemGSM.getBattPercent();
+    Serial.println("Battery level: " + String(battLevel) + "%");
+
+    float battVoltage = modemGSM.getBattVoltage() / 1000.0F;
+    Serial.println("Battery voltage: " + String(battVoltage));
 
     display.clearDisplay();
     display.setTextColor(WHITE);
@@ -771,7 +775,7 @@ void startDisplay(){
     display.println("E-Tapon");
     display.setTextSize(1);
     display.setCursor(20, 40);
-    display.println("Trash bin 1 & 2");
+    display.println("Trash bin 3 & 4");
     display.display();
 
 }
