@@ -17,7 +17,7 @@
 int adcAverage(int batteryPin, int read);
 float adcToVolts(int batteryPin);
 float voltToBatteryPercent(float voltage, float in_min, float in_max, float out_min, float out_max);
-int getThreshold(int distance);
+int getThreshold(float distance);
 void RestartGSMModem();
 void getValue();
 String GSMSignalLevel(int level);
@@ -56,8 +56,13 @@ const long gmtOffset_sec = 8;
 #define ADC_PIN 12
 #define CONV_FACTOR 1.75
 
-NewPing sonar1(ultraTrig1, ultraEcho1);
-NewPing sonar2(ultraTrig2, ultraEcho2);
+#define MAX_DISTANCE 33
+
+NewPing sonar[2] = {
+    NewPing(ultraTrig1, ultraEcho1),
+    NewPing(ultraTrig2, ultraEcho2)
+};
+
 
 #define BUZZZER_PIN 33
 
@@ -171,14 +176,16 @@ const unsigned char trashbin[] = {
 
 
 
-
-
-float distance1, distance2, factoredDis, duration1, duration2;
-int temperature, distanceThresh1, distanceThresh2, bat_percentage, sensorValue;
+String data;
+unsigned int distanceThresh;
+float factoredDis, duration1, duration2, battVoltage, speedOfSound, distance1, distance2;
+int  temperature, distanceThresh1, distanceThresh2, battLevel, sensorValue;
 int currentState1,
-    currentState2;
+    currentState2,
+    sendAttempt;
 float voltage;
 float factor = sqrt(1 + temperature / 273.15) / 60.368;
+bool isSend;
 
 void setup()
 {
@@ -196,16 +203,17 @@ void setup()
     pinMode(BUTTON_PIN_1, INPUT_PULLUP);
     pinMode(BUTTON_PIN_2, INPUT_PULLUP);
 
+    
     currentState1 = digitalRead(BUTTON_PIN_1);
     currentState2 = digitalRead(BUTTON_PIN_2);
-
+    
     Serial.print("BTN 1 state: ");
     Serial.print(currentState1);
     Serial.println("");
     Serial.print("BTN 2 state: ");
     Serial.print(currentState2);
     Serial.println("");
-
+    
     if(currentState1 && currentState2 != 0){
         Serial.println("Please close both lids");
         display.clearDisplay();
@@ -253,12 +261,20 @@ void setup()
         soundRightErr();
         delay(5000);
         goSleep();        
-    } else {
-
     }
 
     startDisplay();
     delay(2000);
+
+    Serial.print("Requesting temperatures...");
+    sensors.requestTemperatures(); // Send the command to get temperatures
+    Serial.println("DONE");
+    temperature = sensors.getTempCByIndex(0);
+        Serial.print("Temperature: ");
+    Serial.println(temperature);
+    speedOfSound = 331.3 + (0.6 * temperature);
+    Serial.print("Speed of Sound: ");
+    Serial.println(speedOfSound);
 
     Init_GSM_SIM800();
 
@@ -276,39 +292,45 @@ void setup()
 void loop()
 {
     getValue();
-    /* Code for no temp and with temp
+    while(SendTextByPOST(server, "/update_data", data)){
+        sendAttempt++;
+        display.clearDisplay();
+        display.setTextColor(WHITE);
+        display.setTextSize(1);
+        display.setFont(NULL);
+        display.setCursor(1, 3);
+        display.print("Retrying");
+        display.display();
+        Serial.print("Attempting to send again: ");
+        Serial.println(sendAttempt);
 
-    Serial.print("Temperature for Device 1 is: ");
-    Serial.println(temperature);
-    float speedOfSound = 331.3 * (sqrt(1 + temperature / 273.15));
+        if(sendAttempt == 5){
+            soundLeftErr();
+            display.clearDisplay();
+            display.setTextColor(WHITE);
+            display.setTextSize(1);
+            display.setFont(NULL);
+            display.setCursor(1, 3);
+            display.print("Failed");
+            display.display();
+            delay(5000);
+            goSleep();
+        }
+    }
 
-    Serial.print("Speed of sound: ");
-    Serial.println(speedOfSound);
+    tone(BUZZZER_PIN, 164.81, 500);
+    tone(BUZZZER_PIN, 220.00, 500);
+    noTone(BUZZZER_PIN);
 
-    duration1 = sonar1.ping_median(5, 50);
-    Serial.print("Ping Median: ");
-    Serial.println(duration1);
-    duration1 = duration1 / 1000000;
-    Serial.print("Duration: ");
-    Serial.println(duration1);
-    distance1 = (speedOfSound * duration1) / 2;
-    distance1 = distance1 * 1000;
-
-    Serial.print("Distance w/ temp: ");
-    Serial.println(distance1);
-    duration2 = sonar2.ping_median(5, 50);
-    Serial.print("Ping Median2: ");
-    Serial.println(duration2);
-    duration2 = duration2 / 1000000;
-    Serial.print("Duration2: ");
-    Serial.println(duration2);
-    distance2 = (340 * duration2) / 2;
-    distance2 = distance2 * 1000;
-
-    Serial.print("Distance w/o temp: ");
-    Serial.println(distance2);
-
-    */
+    display.clearDisplay();
+    display.setTextColor(WHITE);
+    display.setTextSize(1);
+    display.setFont(NULL);
+    display.setCursor(1, 3);
+    display.print("Success");
+    display.display();
+    delay(5000);
+    
     goSleep();
     Serial.println("This will never be printed");
 }
@@ -332,68 +354,42 @@ void goSleep(){
 }
 
 void getValue()
-{
-    Serial.print("Requesting temperatures...");
-    sensors.requestTemperatures(); // Send the command to get temperatures
-    Serial.println("DONE");
-    temperature = sensors.getTempCByIndex(0);
+{   
+    
+      for (uint8_t i = 0; i < 2; i++) { // Loop through each sensor and display results.
+    delayMicroseconds(500); // Wait 50ms between pings (about 20 pings/sec). 29ms should be the shortest delay between pings.
+    Serial.println(i);
 
-    float speedOfSound = 331.3 + (0.6 * temperature);
-    Serial.print("Speed of Sound: ");
-    Serial.println(speedOfSound);
+    if(i == 0 ){
+        duration1 = (float)sonar[i].ping_median(5);
+        duration1 = duration1 / uS_TO_S_FACTOR;
+        distance1 = (duration1 * speedOfSound) / 2;
+        distance1 = distance1 * 100;
+        if(distance1 > 33){
+            distance1 = 33;
+        }
+
+    }else if(i == 1){
+        duration2 = (float)sonar[i].ping_median(5);
+        duration2 = duration2 / uS_TO_S_FACTOR;
+        distance2 = (duration2 * speedOfSound) / 2;
+        distance2 = distance2 * 100;
+        if(distance2 > 33){
+            distance2 = 33;
+        }
+
+    }
+
+    }
+        distanceThresh1 = getThreshold(distance1);
+        distanceThresh2 = getThreshold(distance2);
 
 
-    duration1 = sonar1.ping_median(10);
-    duration1 /= uS_TO_S_FACTOR;
-    distance1 = (duration1 * speedOfSound) / 2;
-    distance1 *= 100;
 
-    Serial.println("Distance1: ");
-    Serial.print(distance1);
-    distanceThresh1 = getThreshold(distance1);
-
-    Serial.println("Distance Threshold 1: ");
-    Serial.print(distanceThresh1);
-    delay(100);
-
-    /*
-        old computation
-    distance1 = sonar1.ping_cm();
-    distanceThresh1 = getThreshold(distance1);
-    Serial.println("Distance1: ");
-    Serial.print(distance1);
-    distance2 = sonar2.ping_cm();
-    distanceThresh2 = getThreshold(distance2);
-    Serial.println("Distance2: ");
-    Serial.print(distance2);
-
-    */
-    duration2 = sonar2.ping_median(10);
-    duration2 /= uS_TO_S_FACTOR;
-    distance2 = (duration2 * speedOfSound) / 2;
-    distance2 *= 100;
-
-    Serial.println("Distance2: ");
-    Serial.print(distance2);
-    distanceThresh2 = getThreshold(distance2);
-
-    Serial.println("Distance Threshold 2: ");
-    Serial.print(distanceThresh2);
-    delay(100);
     
 
-    sensorValue = analogRead(14);
-    voltage = adcToVolts(sensorValue);
-    bat_percentage = voltToBatteryPercent(voltage, 2.5, 4.2, 0, 100);
-    Serial.println("My Computation");
-    Serial.print("Value from pin: ");
-    Serial.println(sensorValue);
-    Serial.print("Voltage read: ");
-    Serial.println(voltage);
-    Serial.print("Battery Percentage: ");
-    Serial.println(bat_percentage);
-    Serial.println("");
-
+    
+    
     delay(5000);
     display.clearDisplay();
     display.drawBitmap(5, 8, trashbin, 128, 64, WHITE);
@@ -419,22 +415,12 @@ void getValue()
     display.println("to the server");
     display.display();
 
-    String data = "{\"binName\":\"" + name + "\",\"battery2\": " + bat_percentage + ",\"bin3\": " + distanceThresh1 + ",\"bin4\": " + distanceThresh2 + "}";
+    data = "{\"binName\":\"" + name + "\",\"battery2\": " + battLevel + ",\"bin3\": " + distanceThresh1 + ",\"bin4\": " + distanceThresh2 + "}";
 
     Serial.println("Send data [" + data + "] to [" + server + "].");
 
-    SendTextByPOST(server, "/update_data", data);
-    tone(BUZZZER_PIN, 164.81, 500);
-    tone(BUZZZER_PIN, 220.00, 500);
-    noTone(BUZZZER_PIN);
-    display.clearDisplay();
-    display.setTextColor(WHITE);
-    display.setTextSize(1);
-    display.setFont(NULL);
-    display.setCursor(1, 3);
-    display.print("Success");
-    display.display();
-    delay(5000);
+
+
 }
 
 int adcAverage(int batteryPin, int read)
@@ -472,11 +458,12 @@ float voltToBatteryPercent(float voltage, float in_min, float in_max, float out_
     }
 }
 
-int getThreshold(int distance)
-{
-    int distanceThresh = 0;
-
-    if (distance <= 2)
+int getThreshold(float distance)
+{    
+    distanceThresh = 100 -(distance / 33) * 100;
+    //int distanceThresh = 0;
+    /*
+    if (distance <= 4)
     {
         distanceThresh = 100;
     }
@@ -496,6 +483,8 @@ int getThreshold(int distance)
     {
         distanceThresh = 0;
     }
+    */
+   
     return distanceThresh;
 }
 
@@ -609,16 +598,13 @@ bool SendTextByPOST(String server, String url, String postData)
 
 void Init_GSM_SIM800()
 {
+
     Serial.println("Initialize GSM modem...");
-    Serial2.begin(9600, SERIAL_8N1, RXD2, TXD2);
+    Serial2.begin(115200, SERIAL_8N1, RXD2, TXD2);
     Serial.println("Serial GSM Txd is on GPIO" + String(TXD2));
     Serial.println("Serial GSM Rxd is on GPIO" + String(RXD2));
 
-    // pinMode(LED_PIN, OUTPUT);
-
-    delay(3000);
-
-    TinyGsmAutoBaud(Serial2, GSM_AUTOBAUD_MIN, GSM_AUTOBAUD_MAX);
+    delay(2000);
 
     String info = modemGSM.getModemInfo();
 
@@ -633,20 +619,6 @@ void Init_GSM_SIM800()
         Serial.println("Modem restart OK");
     }
 
-    if (modemGSM.getSimStatus() != SIM_READY)
-    {
-        Serial.println("Check PIN code for the SIM. SIM status: " + SimStatus(modemGSM.getSimStatus()));
-        if (SIM_PIN != "")
-        {
-            Serial.println("Try to unlock SIM PIN.");
-            modemGSM.simUnlock(SIM_PIN);
-            delay(3000);
-            if (modemGSM.getSimStatus() != 3)
-            {
-                RestartGSMModem();
-            }
-        }
-    }
 
     if (!modemGSM.waitForNetwork())
     {
@@ -684,10 +656,10 @@ void Init_GSM_SIM800()
         RestartGSMModem();
     }
     Serial.println("Signal quality: " + GSMSignalLevel(csq) + " [" + String(csq) + "]");
-    int battLevel = modemGSM.getBattPercent();
+    battLevel = modemGSM.getBattPercent();
     Serial.println("Battery level: " + String(battLevel) + "%");
 
-    float battVoltage = modemGSM.getBattVoltage() / 1000.0F;
+    battVoltage = modemGSM.getBattVoltage() / 1000.0F;
     Serial.println("Battery voltage: " + String(battVoltage));
 
     display.clearDisplay();
@@ -713,6 +685,14 @@ void Init_GSM_SIM800()
     display.println("IP:");
     display.setCursor(45, 39);
     display.print(local.toString());
+    display.setCursor(1, 47);
+    display.println("BattLvl:");
+    display.setCursor(45, 47);
+    display.println(battLevel);
+    display.setCursor(1, 56);
+    display.println("BattVolt:");
+    display.setCursor(45, 56);
+    display.println(battVoltage);
     display.display();
     
     delay(5000);
@@ -817,4 +797,3 @@ void soundRightErr(){
   noTone(BUZZZER_PIN);
   delay(1500);
 }
-
