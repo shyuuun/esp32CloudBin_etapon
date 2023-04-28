@@ -4,7 +4,9 @@
 #include <LiquidCrystal_I2C.h>
 #include <NewPing.h>
 
-void servoTest();
+
+
+void servoRight();
 void servoLeft();
 void detectObject();
 void detectMetalObject();
@@ -33,7 +35,7 @@ void detectMetalObject();
 #define ECHO_RIGHT 19
 
 LiquidCrystal_I2C lcd(0x3F, 16, 2); // 0x3F 
-Servo servo, servoBin1, servoBin2;
+Servo servoCheck, servoEject, servoBin2;
 
 NewPing sonarCheck(TRIG_CHECK, ECHO_CHECK);
 NewPing sonarLeft(TRIG_LEFT, ECHO_LEFT);
@@ -49,7 +51,8 @@ void setup() {
     //pinMode(TRIG_PIN1, OUTPUT);
     //pinMode(ECHO_PIN1, INPUT);
     Serial.println("Initialize Metal Sensor");
-    servoBin1.attach(SERVO_CHECK);
+    servoCheck.attach(SERVO_CHECK);
+    servoEject.attach(SERVO_EJECT);
     //servoBin2.attach(SERVO_BIN2_PIN);
     lcd.init();
     Serial.println("Initialize LCD Screen");
@@ -102,7 +105,7 @@ void detectObject(){
 void detectMetalObject(){
     metal_value = digitalRead(METAL_PIN);
     if(metal_value == 0){
-        lcd.setCursor(2,0); 
+        lcd.setCursor(0,0); 
         lcd.print("Metal Detected!");
         Serial.println("Metal Detected");
 
@@ -118,14 +121,14 @@ void detectMetalObject(){
             Serial.println(numLeft);
         }
         */
-
+        servoLeft();
 
     }else {
         lcd.setCursor(0,0); 
         lcd.print("Non-Metal Detected!");
         Serial.println("Metal not detected");   
 
-        delay(5000);
+
         /*
         if(!hasDrop()){
             Serial.println("Waiting for object to be dropped");
@@ -135,8 +138,64 @@ void detectMetalObject(){
             Serial.println(numRight);
         }
         */
-
+        servoRight();
     }
+}
+
+void servoLeft(){
+
+    // go to the left bin
+    servoCheck.writeMicroseconds(1000);
+    delay(300);
+    Serial.println(servoCheck.read());
+    servoCheck.writeMicroseconds(1500);
+    delay(300);
+    Serial.println(servoCheck.read());
+
+    delay(1500);
+    servoEject.write(180);
+    delay(1500);
+
+    // back to normal state
+    servoCheck.writeMicroseconds(2000);
+    delay(300);
+    Serial.println(servoCheck.read());
+    servoCheck.writeMicroseconds(1500);
+    delay(300);
+    Serial.println(servoCheck.read());
+
+    delay(1500);
+    servoEject.write(0);
+    delay(1500);
+}
+
+void servoRight(){
+    // go to right bin
+    servoCheck.writeMicroseconds(2000);
+    delay(150);
+    servoCheck.writeMicroseconds(1500);
+    delay(150);
+    servoCheck.writeMicroseconds(2000);
+    delay(150);
+    servoCheck.writeMicroseconds(1500);
+    delay(150);
+
+    delay(1500);
+    servoEject.write(180);
+    delay(1500);
+
+    servoCheck.writeMicroseconds(0);
+    delay(150);
+    servoCheck.writeMicroseconds(1500);
+    delay(150);
+    servoCheck.writeMicroseconds(0);
+    delay(175);
+    servoCheck.writeMicroseconds(1500);
+    delay(150);
+
+    delay(1500);
+    servoEject.write(0);
+    delay(1500);
 }
 
 
