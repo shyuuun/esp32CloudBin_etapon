@@ -146,23 +146,28 @@ void servoLeft(){
 
     // go to the left bin
     servoCheck.writeMicroseconds(1000);
-    delay(300);
-    Serial.println(servoCheck.read());
+    delay(150);
     servoCheck.writeMicroseconds(1500);
-    delay(300);
-    Serial.println(servoCheck.read());
+    delay(150);
+    servoCheck.writeMicroseconds(1000);
+    delay(150);
+    servoCheck.writeMicroseconds(1500);
+    delay(150);
 
     delay(1500);
     servoEject.write(180);
     delay(1500);
 
-    // back to normal state
+    // back to normal 
+
     servoCheck.writeMicroseconds(2000);
-    delay(300);
-    Serial.println(servoCheck.read());
+    delay(150);
     servoCheck.writeMicroseconds(1500);
-    delay(300);
-    Serial.println(servoCheck.read());
+    delay(150);
+    servoCheck.writeMicroseconds(2000);
+    delay(150);
+    servoCheck.writeMicroseconds(1500);
+
 
     delay(1500);
     servoEject.write(0);
@@ -197,5 +202,7 @@ void servoRight(){
     servoEject.write(0);
     delay(1500);
 }
+
+
 
 
