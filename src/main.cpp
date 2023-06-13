@@ -15,6 +15,8 @@ void openSort();
 boolean checkMetal();
 boolean checkNonBio();
 void objectDetection();
+void rotateLeft();
+void rotateRight();
 
 void RestartGSMModem();
 String GSMRegistrationStatus(RegStatus state);
@@ -107,8 +109,8 @@ void setup() {
 
     servoSort.setPeriodHertz(50);
     servoSort.attach(SERVO_SORT);
-
-    servoSort.write(180);
+    servoDrop.setPeriodHertz(50);
+    servoDrop.attach(SERVO_DROP);
 
 
     // Initializing LCD screen
@@ -127,8 +129,10 @@ void setup() {
 }
 
 void loop() {
-    // make sure the sort is always off
+    // make sure the sort door is always closed 
     servoSort.write(0);
+    // default position of the servoDrop motor
+    servoDrop.write(120);
 
     objectDetection();
     delay(500);
@@ -165,6 +169,7 @@ boolean checkNonBio(){
 
 // This function will tell if the object is present within in the sorting area of the bin
 void objectDetection(){
+
     ir_value = digitalRead(IR_PIN);
     Serial.println("Object Detected");
     Serial.println("Checking...");
@@ -172,9 +177,11 @@ void objectDetection(){
 
     if(checkMetal()){
         Serial.println("Rotating to the left side of the bin");
+        rotateLeft();
         openSort();
     } else if (checkNonBio()){
         Serial.println("Rotating to the right side of the bin");
+        rotateRight();
         openSort();
     } else {
         Serial.println("Object doesnt detect properly");
@@ -186,7 +193,7 @@ void objectDetection(){
 void openBin1(){
     // Set period of hertz to the servo motor 
 	servoBin1.setPeriodHertz(50);    // standard 50 hz servo
-	//servoBin1.attach(SERVO_BIN1); // attaches the servo on pin 18 to the servo object
+	servoBin1.attach(SERVO_BIN1);    // attaches the servo on pin 18 to the servo object
 
     Serial.print("Bin 1 opened: ");
     servoBin1.write(180);
@@ -198,7 +205,7 @@ void openBin1(){
 void openBin2(){
     // Set period of hertz to the servo motor 
 	servoBin2.setPeriodHertz(50);    // standard 50 hz servo
-	servoBin2.attach(SERVO_BIN2); // attaches the servo on pin 18 to the servo object
+	servoBin2.attach(SERVO_BIN2);   // attaches the servo on pin 18 to the servo object
 
     Serial.print("Bin 2 opened: ");
     servoBin2.write(180);
@@ -208,14 +215,28 @@ void openBin2(){
 }
 
 void openSort(){
-    servoSort.setPeriodHertz(50);
-    servoSort.attach(SERVO_SORT);
+
 
     Serial.println("Sort door opened: ");
     servoSort.write(0);
     delay(1500);
     servoSort.write(200);
     delay(1500);
+}
+
+void rotateLeft(){
+    servoDrop.setPeriodHertz(50);
+    servoDrop.attach(SERVO_DROP);
+
+    Serial.println("Rotating to the left side of the bin");
+    servoDrop.write(30);
+    delay(1000);
+}
+
+void rotateRight(){
+    Serial.println("Rotating to the right side of the bin");
+    servoDrop.write(180);
+    delay(1000);
 }
 
 // For SIM800L Module 
