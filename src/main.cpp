@@ -124,7 +124,7 @@ void setup() {
     lcd.print("E-Tapon");
     delay(5000);
 
-    // Init_GSM_SIM800(); // turn on the sim800l module
+    Init_GSM_SIM800(); // turn on the sim800l module
     
 }
 
@@ -135,7 +135,6 @@ void loop() {
     servoDrop.write(120);
 
     objectDetection();
-    checkBin();
     delay(150);
 }
 
@@ -169,32 +168,78 @@ boolean checkNonBio(){
 
 // This function will tell if the object is present within in the sorting area of the bin
 void objectDetection(){
+    delay(500);
     Serial.println("Waiting for Object");
 
+    lcd.setCursor(3,0);
+    lcd.print("Waiting for");
+    lcd.setCursor(5 ,1);
+    lcd.print("Object");
+
     if(checkMetal()){
+        lcd.clear();
+        lcd.setCursor(0,0);
+        lcd.print("Object: Metal");
         Serial.println("Rotating to the left side of the bin");
+
         rotateLeft();
         openSort();
 
         // verifies if the metal object placed to the bin
         if(checkMetal() == true){
+            lcd.clear();
+            lcd.setCursor(0,0);
+            lcd.print("Object doesn't fit");
+            delay(1500);
+            lcd.clear();
+
             Serial.println("Object doesnt fit to the sorting tray");
             Serial.println("Please arrange it properly");
         } else {
+            
+            lcd.clear();
+            lcd.setCursor(0,0);
+            lcd.print("Object placed at");
+            lcd.setCursor(0,1);
+            lcd.print("Metal bin");
+            delay(1500);
+            lcd.clear();
+
             Serial.println("Object placed at Metal Bin");
+
+            checkBin();
         }
 
     } else if (checkNonBio()){
+        lcd.clear();
+        lcd.setCursor(0,0);
+        lcd.print("Object: Non-Metal");
+
         Serial.println("Rotating to the right side of the bin");
         rotateRight();
         openSort();
 
         // verifies if the non-metal object placed to the bin
-        if(checkMetal() == true){
+        if(checkNonBio() == true){
+            lcd.clear();
+            lcd.setCursor(0,0);
+            lcd.print("Object doesn't fit");
+            delay(1500);
+            lcd.clear();
+
             Serial.println("Object doesnt fit to the sorting tray");
             Serial.println("Please arrange it properly");
         } else {
-            Serial.println("Object placed at Metal Bin");
+
+            lcd.clear();
+            lcd.setCursor(0,0);
+            lcd.print("Object placed at");
+            lcd.setCursor(0,1);
+            lcd.print("Non-metal bin");
+            delay(1500);
+            lcd.clear();
+
+            Serial.println("Object placed at Non-metal Bin");
         }
     } 
 }
@@ -266,20 +311,46 @@ void checkBin(){
     
     if(sonarLeftVal <= 10 || sonarLeftVal > 40){
         Serial.println("Trash bin on the left is full");
+
+        lcd.clear();
+        lcd.setCursor(0,0);
+        lcd.println("Metal Bin: Full");
+
         sonarLeftVal = 1;
+
+        delay(1500);
+        
     } else {
         Serial.println("Trash bin on the left is not full");
+
+        lcd.clear();
+        lcd.setCursor(0,0);
+        lcd.println("Metal Bin:");
+        lcd.setCursor(0,1);
+        lcd.println("Not Full");
         sonarLeftVal = 0;
+        delay(1500);
     }
 
     if(sonarRightVal <= 10 || sonarRightVal > 40){
         Serial.println("Trash bin on the right is full");
+        lcd.clear();
+        lcd.setCursor(0,0);
+        lcd.println("NonMtl Bin: Full");
         sonarRightVal = 1;
+        delay(1500);
     } else {
         Serial.println("Trash bin on the right is not full");
-        sonarRightVal = 0;
-    }
 
+        lcd.clear();
+        lcd.setCursor(0,0);
+        lcd.println("NonMtl Bin:");
+        lcd.setCursor(0,1);
+        lcd.println("Not Full");
+        sonarRightVal = 0;
+        delay(1500);
+    }
+    lcd.clear();
 }
 
 // For SIM800L Module 
@@ -291,6 +362,7 @@ void Init_GSM_SIM800()
     Serial2.begin(115200, SERIAL_8N1, RXD2, TXD2);
     Serial.println("Serial GSM Txd is on GPIO" + String(TXD2));
     Serial.println("Serial GSM Rxd is on GPIO" + String(RXD2));
+
 
 
     String info = modemGSM.getModemInfo();
