@@ -11,8 +11,11 @@
 
 void openBin1();
 void openBin2();
-void detectObject();
-void detectMetalObject();
+void openSort();
+boolean checkMetal();
+boolean checkNonBio();
+void objectDetection();
+
 void RestartGSMModem();
 String GSMRegistrationStatus(RegStatus state);
 String SIMStatus(SimStatus state);
@@ -25,10 +28,10 @@ void Init_GSM_SIM800();
 
 // Check is the servo motor that goes in left and right position of the bin while eject is makes the object falls to the bin 
 
-#define SERVO_BIN1  16
+#define SERVO_BIN1 16
 #define SERVO_BIN2 4
-#define SERVO_SORT 
-#define SERVO_DROP
+#define SERVO_SORT 18
+#define SERVO_DROP 19
 
 //#define BUZZER_PIN 13
 
@@ -41,8 +44,8 @@ void Init_GSM_SIM800();
 #define ECHO_CHECK 32
 #define TRIG_LEFT 17
 #define ECHO_LEFT 5
-#define TRIG_RIGHT 18
-#define ECHO_RIGHT 19
+
+#define IR_PIN 23
 
 // RX/TX Pins for sim 800;
 
@@ -55,7 +58,7 @@ Servo servoBin1, servoBin2, servoSort, servoDrop;
 
 NewPing sonarCheck(TRIG_CHECK, ECHO_CHECK);
 NewPing sonarLeft(TRIG_LEFT, ECHO_LEFT);
-NewPing sonarRight(TRIG_RIGHT, ECHO_RIGHT);
+
 
 
 TinyGsm modemGSM(Serial2);
@@ -84,9 +87,8 @@ int Modem_Reboots_Counter = 0;
 HTTPClient *http;
 
 int metal_value = 0;
-int numLeft , numRight, numAll;
+int ir_value = 0;
 
-int servoCheckPos = 0;
 
 void setup() {
     Serial.begin(9600);
@@ -95,12 +97,18 @@ void setup() {
     //pinMode(ECHO_PIN1, INPUT);
     Serial.println("Initialize Metal Sensor");
     pinMode(METAL_PIN, INPUT);
+    pinMode(IR_PIN, INPUT);
 
     // Allow allocation of all timers
 	ESP32PWM::allocateTimer(0);
 	ESP32PWM::allocateTimer(1);
 	ESP32PWM::allocateTimer(2);
 	ESP32PWM::allocateTimer(3);
+
+    servoSort.setPeriodHertz(50);
+    servoSort.attach(SERVO_SORT);
+
+    servoSort.write(180);
 
 
     // Initializing LCD screen
@@ -119,8 +127,58 @@ void setup() {
 }
 
 void loop() {
-    // Testing
+    // make sure the sort is always off
+    servoSort.write(0);
 
+    objectDetection();
+    delay(500);
+}
+
+// For Metal Detection
+boolean checkMetal(){
+    metal_value = digitalRead(METAL_PIN);
+    Serial.print("Metal Value: "); // 1 if metal is detected and 0 is not
+    Serial.println(metal_value);
+
+    if(metal_value == LOW){
+        Serial.println("This object is metal");
+        return true;        
+    } else {
+        return false;
+    }
+}
+
+// For Non-metal Detection
+boolean checkNonBio(){
+    Serial.println("This is non bio");
+    ir_value = digitalRead(IR_PIN);
+    Serial.print("IR Value: "); // 1 if nonmetal is detected and 0 is not
+    Serial.println(ir_value);
+
+    if(ir_value == LOW){
+        Serial.println("This object is non-metal");
+        return true;        
+    } else {
+        return false;
+    }
+}
+
+// This function will tell if the object is present within in the sorting area of the bin
+void objectDetection(){
+    ir_value = digitalRead(IR_PIN);
+    Serial.println("Object Detected");
+    Serial.println("Checking...");
+    delay(500);
+
+    if(checkMetal()){
+        Serial.println("Rotating to the left side of the bin");
+        openSort();
+    } else if (checkNonBio()){
+        Serial.println("Rotating to the right side of the bin");
+        openSort();
+    } else {
+        Serial.println("Object doesnt detect properly");
+    }
 }
 
 // For Servo motors
@@ -128,7 +186,7 @@ void loop() {
 void openBin1(){
     // Set period of hertz to the servo motor 
 	servoBin1.setPeriodHertz(50);    // standard 50 hz servo
-	servoBin1.attach(SERVO_BIN1); // attaches the servo on pin 18 to the servo object
+	//servoBin1.attach(SERVO_BIN1); // attaches the servo on pin 18 to the servo object
 
     Serial.print("Bin 1 opened: ");
     servoBin1.write(180);
@@ -149,8 +207,16 @@ void openBin2(){
     delay(1500);
 }
 
+void openSort(){
+    servoSort.setPeriodHertz(50);
+    servoSort.attach(SERVO_SORT);
 
-
+    Serial.println("Sort door opened: ");
+    servoSort.write(0);
+    delay(1500);
+    servoSort.write(200);
+    delay(1500);
+}
 
 // For SIM800L Module 
 
