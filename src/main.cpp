@@ -5,7 +5,7 @@
 #include <NewPing.h>
 #define TINY_GSM_MODEM_SIM800
 #include <TinyGsmClient.h>
-#include <HTTPClient.h>
+#include <ArduinoHttpClient.h>
 
 
 
@@ -18,7 +18,7 @@ void objectDetection();
 void rotateLeft();
 void rotateRight();
 void checkBin();
-
+bool SendTextByPOST();
 void RestartGSMModem();
 String GSMRegistrationStatus(RegStatus state);
 String SIMStatus(SimStatus state);
@@ -86,7 +86,7 @@ const int port = 80;
 
 int Modem_Reboots_Counter = 0;
 
-HTTPClient *http;
+HttpClient *http;
 
 int metal_value = 0;
 int ir_value = 0;
@@ -363,7 +363,10 @@ void Init_GSM_SIM800()
     Serial.println("Serial GSM Txd is on GPIO" + String(TXD2));
     Serial.println("Serial GSM Rxd is on GPIO" + String(RXD2));
 
-
+    lcd.clear();
+    lcd.setCursor(0,0);
+    lcd.print("Init GSM Modem");
+    delay(1500);
 
     String info = modemGSM.getModemInfo();
 
@@ -376,12 +379,22 @@ void Init_GSM_SIM800()
     else
     {
         Serial.println("Modem restart OK");
+        lcd.clear();
+        lcd.setCursor(0,0);
+        lcd.print("Modem restarting");
+        delay(1500);
     }
 
 
     if (!modemGSM.waitForNetwork())
     {
         Serial.println("Failed to connect to network");
+
+        lcd.clear();
+        lcd.setCursor(0,0);
+        lcd.print("Failed Network");
+        delay(1500);
+
         RestartGSMModem();
     }
     else
@@ -389,6 +402,13 @@ void Init_GSM_SIM800()
         RegStatus registration = modemGSM.getRegistrationStatus();
         Serial.println("Registration: [" + GSMRegistrationStatus(registration) + "]");
         Serial.println("Modem network OK");
+
+        lcd.clear();
+        lcd.setCursor(0,0);
+        lcd.print("Modem network:");
+        lcd.setCursor(5,1);
+        lcd.print("OK");
+        delay(1500);
     }
 
     Serial.println(modemGSM.gprsConnect(APN_NAME, APN_USER, APN_PSWD) ? "GPRS Connect OK" : "GPRS Connection failed");
@@ -415,6 +435,17 @@ void Init_GSM_SIM800()
         RestartGSMModem();
     }
     Serial.println("Signal quality: " + GSMSignalLevel(csq) + " [" + String(csq) + "]");
+
+    lcd.clear();
+    lcd.setCursor(0,0);
+    lcd.print("GPRS: ");
+    lcd.print(state);
+    lcd.setCursor(0,1);
+    lcd.print("Signal: ");
+    lcd.print(csq);
+    delay(1500);
+
+    lcd.clear();
 }
 
 void RestartGSMModem()
@@ -469,4 +500,43 @@ String GSMRegistrationStatus(RegStatus state)
         return "Unknown";
     }
     return "Unknown";
+}
+
+bool SendTextByPOST(String server, String url, String postData)
+{
+    bool stateGPRS = modemGSM.isGprsConnected();
+    bool res = false;
+    if (stateGPRS)
+    {
+        http = new HttpClient(clientGSM, server, port);
+        Serial.println("Send POST request...");
+        http->beginRequest();
+        http->post(url);
+        http->sendHeader("Content-Type", "application/json");
+        http->sendHeader("Content-Length", postData.length());
+        // http.sendHeader("X-Custom-Header", "custom-header-value");
+        http->beginBody();
+        http->print(postData);
+        http->endRequest();
+
+    
+        // read the status code and body of the response
+        int statusCode = http->responseStatusCode();
+
+        if (statusCode == 200)
+        {
+            String response = http->responseBody();
+            Serial.println("Status code: " + String(statusCode));
+            Serial.println("Response: " + response);
+            res = false;
+        }
+        else
+        {
+            Serial.println("Error code: " + String(statusCode));
+            res = true;
+        }
+
+        http->stop();
+    }
+    return res;
 }
