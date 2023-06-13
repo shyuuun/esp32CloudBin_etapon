@@ -17,6 +17,7 @@ boolean checkNonBio();
 void objectDetection();
 void rotateLeft();
 void rotateRight();
+void checkBin();
 
 void RestartGSMModem();
 String GSMRegistrationStatus(RegStatus state);
@@ -42,8 +43,8 @@ void Init_GSM_SIM800();
     Check is the ultrasonic sensor that check if there is any object placed on the cylinder 
 
 */
-#define TRIG_CHECK 33
-#define ECHO_CHECK 32
+#define TRIG_RIGHT 33
+#define ECHO_RIGHT 32
 #define TRIG_LEFT 17
 #define ECHO_LEFT 5
 
@@ -57,8 +58,7 @@ void Init_GSM_SIM800();
 LiquidCrystal_I2C lcd(0x3F, 16, 2); // 0x3F 
 Servo servoBin1, servoBin2, servoSort, servoDrop;
 
-
-NewPing sonarCheck(TRIG_CHECK, ECHO_CHECK);
+NewPing sonarRight(TRIG_RIGHT, ECHO_RIGHT);
 NewPing sonarLeft(TRIG_LEFT, ECHO_LEFT);
 
 
@@ -90,7 +90,7 @@ HTTPClient *http;
 
 int metal_value = 0;
 int ir_value = 0;
-
+int sonarLeftVal, sonarRightVal;
 
 void setup() {
     Serial.begin(9600);
@@ -135,7 +135,8 @@ void loop() {
     servoDrop.write(120);
 
     objectDetection();
-    delay(500);
+    checkBin();
+    delay(150);
 }
 
 // For Metal Detection
@@ -154,7 +155,6 @@ boolean checkMetal(){
 
 // For Non-metal Detection
 boolean checkNonBio(){
-    Serial.println("This is non bio");
     ir_value = digitalRead(IR_PIN);
     Serial.print("IR Value: "); // 1 if nonmetal is detected and 0 is not
     Serial.println(ir_value);
@@ -169,23 +169,34 @@ boolean checkNonBio(){
 
 // This function will tell if the object is present within in the sorting area of the bin
 void objectDetection(){
-
-    ir_value = digitalRead(IR_PIN);
-    Serial.println("Object Detected");
-    Serial.println("Checking...");
-    delay(500);
+    Serial.println("Waiting for Object");
 
     if(checkMetal()){
         Serial.println("Rotating to the left side of the bin");
         rotateLeft();
         openSort();
+
+        // verifies if the metal object placed to the bin
+        if(checkMetal() == true){
+            Serial.println("Object doesnt fit to the sorting tray");
+            Serial.println("Please arrange it properly");
+        } else {
+            Serial.println("Object placed at Metal Bin");
+        }
+
     } else if (checkNonBio()){
         Serial.println("Rotating to the right side of the bin");
         rotateRight();
         openSort();
-    } else {
-        Serial.println("Object doesnt detect properly");
-    }
+
+        // verifies if the non-metal object placed to the bin
+        if(checkMetal() == true){
+            Serial.println("Object doesnt fit to the sorting tray");
+            Serial.println("Please arrange it properly");
+        } else {
+            Serial.println("Object placed at Metal Bin");
+        }
+    } 
 }
 
 // For Servo motors
@@ -215,11 +226,9 @@ void openBin2(){
 }
 
 void openSort(){
-
-
     Serial.println("Sort door opened: ");
     servoSort.write(0);
-    delay(1500);
+    delay(2000);
     servoSort.write(200);
     delay(1500);
 }
@@ -237,6 +246,40 @@ void rotateRight(){
     Serial.println("Rotating to the right side of the bin");
     servoDrop.write(180);
     delay(1000);
+}
+
+// Checking the conditons of the bin
+void checkBin(){
+    sonarLeftVal = sonarLeft.ping_cm();
+    sonarRightVal = sonarRight.ping_cm();
+
+    Serial.println("Sonar Left: ");
+    Serial.print(sonarLeftVal);
+    Serial.println("Sonar Right: ");
+    Serial.print(sonarRightVal);
+    
+    /*
+        the width of the trash bin is 36cm
+        if the objects are near the ultrasonic sensor e.g. 10cm
+        it is considered full
+    */
+    
+    if(sonarLeftVal <= 10 || sonarLeftVal > 40){
+        Serial.println("Trash bin on the left is full");
+        sonarLeftVal = 1;
+    } else {
+        Serial.println("Trash bin on the left is not full");
+        sonarLeftVal = 0;
+    }
+
+    if(sonarRightVal <= 10 || sonarRightVal > 40){
+        Serial.println("Trash bin on the right is full");
+        sonarRightVal = 1;
+    } else {
+        Serial.println("Trash bin on the right is not full");
+        sonarRightVal = 0;
+    }
+
 }
 
 // For SIM800L Module 
